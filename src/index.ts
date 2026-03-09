@@ -1,5 +1,4 @@
 import {StreamLanguage, LanguageSupport, StreamParser, foldService, indentService} from "@codemirror/language"
-import {Tag, tags as t, styleTags} from "@lezer/highlight"
 import {Completion, CompletionContext, CompletionResult} from "@codemirror/autocomplete"
 
 interface HledgerState {
