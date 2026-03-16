@@ -1,5 +1,5 @@
 import {EditorView, basicSetup} from "codemirror"
-import {hledger} from "../dist/index.js"
+import {hledger, parser} from "../dist/index.js"
 
 const sampleJournal = `; Main journal file
 account assets:checking
@@ -45,8 +45,39 @@ decimal-mark .
 year 2024
 `
 
-new EditorView({
+const astOutput = document.getElementById("ast")
+
+function formatAst(doc: string) {
+  const cursor = parser.parse(doc).cursor()
+  const lines: string[] = []
+
+  function walk(depth = 0) {
+    lines.push(`${"  ".repeat(depth)}${cursor.name} [${cursor.from}, ${cursor.to}]`)
+    if (cursor.firstChild()) {
+      do walk(depth + 1)
+      while (cursor.nextSibling())
+      cursor.parent()
+    }
+  }
+
+  walk()
+  return lines.join("\n")
+}
+
+function renderAst(view: EditorView) {
+  if (astOutput) astOutput.textContent = formatAst(view.state.doc.toString())
+}
+
+const view = new EditorView({
   doc: sampleJournal,
-  extensions: [basicSetup, hledger()],
+  extensions: [
+    basicSetup,
+    hledger(),
+    EditorView.updateListener.of(update => {
+      if (update.docChanged) renderAst(update.view)
+    }),
+  ],
   parent: document.getElementById("editor")!
 })
+
+renderAst(view)

@@ -4,14 +4,138 @@
   <meta charset="utf-8">
   <title>codemirror-lang-hledger demo</title>
   <style>
-    body { font-family: system-ui; max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
-    h1 { font-size: 1.4rem; }
-    #editor { border: 1px solid #ccc; border-radius: 4px; }
+    :root {
+      color-scheme: light;
+      --page-bg: #f4efe4;
+      --panel-bg: #fffdf7;
+      --panel-border: #d8ccb5;
+      --text: #2f2418;
+      --muted: #6b5a47;
+      --accent: #a85c2c;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 2rem;
+      font-family: "Iowan Old Style", "Palatino Linotype", serif;
+      background:
+        radial-gradient(circle at top, rgba(168, 92, 44, 0.12), transparent 28%),
+        linear-gradient(180deg, #faf6ec 0%, var(--page-bg) 100%);
+      color: var(--text);
+    }
+
+    main {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      margin: 0 0 0.35rem;
+      font-size: clamp(1.6rem, 1.4rem + 1vw, 2.4rem);
+      letter-spacing: 0.02em;
+    }
+
+    p {
+      margin: 0 0 1.5rem;
+      color: var(--muted);
+    }
+
+    .demo-shell {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+      gap: 1rem;
+      align-items: start;
+    }
+
+    .panel {
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 18px 40px rgba(84, 56, 27, 0.08);
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid var(--panel-border);
+      background: rgba(255, 250, 240, 0.95);
+    }
+
+    .panel-header strong {
+      font-size: 0.95rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .panel-header span {
+      color: var(--accent);
+      font-size: 0.85rem;
+    }
+
+    #editor {
+      min-height: 70vh;
+    }
+
+    .cm-editor {
+      height: 70vh;
+    }
+
+    #ast {
+      margin: 0;
+      min-height: 70vh;
+      max-height: 70vh;
+      overflow: auto;
+      padding: 1rem;
+      font: 0.88rem/1.45 "SFMono-Regular", "Menlo", monospace;
+      white-space: pre;
+      background: linear-gradient(180deg, rgba(250, 246, 236, 0.6), rgba(255, 255, 255, 0));
+    }
+
+    @media (max-width: 960px) {
+      body {
+        padding: 1rem;
+      }
+
+      .demo-shell {
+        grid-template-columns: 1fr;
+      }
+
+      #editor,
+      .cm-editor,
+      #ast {
+        min-height: 50vh;
+        max-height: none;
+        height: auto;
+      }
+    }
   </style>
 </head>
 <body>
-  <h1>codemirror-lang-hledger</h1>
-  <div id="editor"></div>
+  <main>
+    <h1>codemirror-lang-hledger</h1>
+    <p>Edit the sample journal on the left. The live Lezer syntax tree is shown on the right.</p>
+    <div class="demo-shell">
+      <section class="panel">
+        <div class="panel-header">
+          <strong>Editor</strong>
+          <span>CodeMirror 6</span>
+        </div>
+        <div id="editor"></div>
+      </section>
+      <section class="panel">
+        <div class="panel-header">
+          <strong>AST</strong>
+          <span>Full parse tree</span>
+        </div>
+        <pre id="ast"></pre>
+      </section>
+    </div>
+  </main>
   <script type="module" src="./demo.ts"></script>
 </body>
 </html>
