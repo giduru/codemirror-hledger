@@ -1,6 +1,6 @@
 {
   "name": "codemirror-lang-hledger",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "hledger journal format language support for CodeMirror",
   "scripts": {
     "test": "mocha test/test.js",
@@ -26,7 +26,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/knupfer/codemirror-hledger.git"
+    "url": "git+https://github.com/KonradStanski/codemirror-hledger.git"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.0.0",
