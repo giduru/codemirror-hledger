@@ -1,0 +1,103 @@
+@top Journal { item* }
+
+item {
+  Transaction |
+  PeriodicTransaction |
+  AutoPosting |
+  Directive |
+  BlockComment |
+  LineComment |
+  BlankLine
+}
+
+Transaction {
+  TxnHeader
+  indentedLine*
+}
+
+PeriodicTransaction {
+  PeriodicHeader
+  indentedLine*
+}
+
+AutoPosting {
+  AutoHeader
+  indentedLine*
+}
+
+indentedLine {
+  Posting |
+  IndentedComment
+}
+
+Posting {
+  PostingIndent Status? AccountName Amount? CostAnnotation? BalanceAssertion? InlineComment? Newline
+}
+
+Amount {
+  Commodity? Sign? Number Commodity?
+}
+
+CostAnnotation {
+  CostOp Commodity? Sign? Number Commodity?
+}
+
+BalanceAssertion {
+  BalanceOp Commodity? Sign? Number Commodity?
+}
+
+IndentedComment {
+  CommentIndent CommentBody Newline
+}
+
+InlineComment { CommentMark CommentBody }
+
+@external tokens headerTokens from "./tokens" {
+  TxnHeader,
+  PeriodicHeader,
+  AutoHeader,
+  Directive,
+  BlockComment,
+  LineComment,
+  BlankLine
+}
+
+@external tokens postingTokens from "./tokens" {
+  PostingIndent,
+  CommentIndent,
+  Newline
+}
+
+@external tokens accountNameToken from "./tokens" {
+  AccountName
+}
+
+@external tokens commentBodyToken from "./tokens" {
+  CommentBody
+}
+
+@tokens {
+  Status { "!" | "*" }
+
+  Number { @digit (@digit | $[,. ])* @digit | @digit }
+
+  Sign { "+" | "-" }
+
+  Commodity { "\"" !["\n]* "\""
+            | $[$€£¥₹₽₿₩₪₺₴₦₡₣₤₧₨]
+            | @asciiUppercase (@asciiLetter | @digit | "_")* }
+
+  CostOp { "@@" | "@" }
+
+  BalanceOp { "==" "*"? | "=" "*"? }
+
+  CommentMark { ";" }
+
+  spaces { $[ \t]+ }
+
+  @precedence { CostOp, BalanceOp, Sign, Number, Commodity, Status, CommentMark }
+}
+
+@skip { spaces }
+
+@detectDelim

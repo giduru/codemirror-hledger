@@ -1,5 +1,5 @@
 import {EditorView, basicSetup} from "codemirror"
-import {hledger} from "../src/index"
+import {hledger} from "../dist/index.js"
 
 const sampleJournal = `; Main journal file
 account assets:checking

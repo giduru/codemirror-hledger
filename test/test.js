@@ -17,7 +17,31 @@ function tokenize(input) {
   return tokens
 }
 
-// Simple test: verify the language object is created and can parse without errors
+function printTree(input) {
+  let tree = hledgerLanguage.parser.parse(input)
+  let lines = []
+  tree.iterate({
+    enter(node) {
+      let indent = "  ".repeat(node.depth || 0)
+      let text = input.slice(node.from, node.to).replace(/\n/g, "\\n")
+      if (text.length > 50) text = text.slice(0, 47) + "..."
+      lines.push(`${indent}${node.type.name} [${node.from}-${node.to}] "${text}"`)
+    }
+  })
+  return lines.join("\n")
+}
+
+function getNodeNames(input) {
+  let tree = hledgerLanguage.parser.parse(input)
+  let names = []
+  tree.iterate({
+    enter(node) {
+      if (node.type.name !== "⚠") names.push(node.type.name)
+    }
+  })
+  return names
+}
+
 describe("hledger language", () => {
   it("should export hledgerLanguage", () => {
     assert.ok(hledgerLanguage)
@@ -121,6 +145,24 @@ describe("hledger language", () => {
     let input = "2024-01-15 test\n    (budget:food)  $50\n    [assets:checking]  $50\n"
     let tree = hledgerLanguage.parser.parse(input)
     assert.ok(tree)
+  })
+
+  it("should produce Transaction nodes with Posting children", () => {
+    let input = "2024-01-15 Grocery store\n    expenses:food  $50.00\n    assets:checking\n"
+    let names = getNodeNames(input)
+    assert.ok(names.includes("Journal"))
+    assert.ok(names.includes("Transaction"))
+    assert.ok(names.includes("TxnHeader"))
+    assert.ok(names.includes("Posting"))
+    assert.ok(names.includes("AccountName"))
+  })
+
+  it("should produce Amount nodes with Commodity and Number", () => {
+    let input = "2024-01-15 test\n    expenses:food  $50.00\n    assets:checking\n"
+    let names = getNodeNames(input)
+    assert.ok(names.includes("Amount"))
+    assert.ok(names.includes("Number"))
+    assert.ok(names.includes("Commodity"))
   })
 
   it("should parse complex journal", () => {

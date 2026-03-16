@@ -5,7 +5,7 @@
   "scripts": {
     "test": "mocha test/test.js",
     "prepare": "rollup -c",
-    "demo": "vite demo"
+    "demo": "npm run prepare && vite demo"
   },
   "type": "module",
   "main": "dist/index.cjs",
@@ -30,9 +30,12 @@
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.0.0",
-    "@codemirror/language": "^6.0.0"
+    "@codemirror/language": "^6.0.0",
+    "@lezer/highlight": "^1.2.3",
+    "@lezer/lr": "^1.4.8"
   },
   "devDependencies": {
+    "@lezer/generator": "^1.8.0",
     "@rollup/plugin-typescript": "^12.1.4",
     "@types/node": "^24.1.0",
     "codemirror": "^6.0.2",
