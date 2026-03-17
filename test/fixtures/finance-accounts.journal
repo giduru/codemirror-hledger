@@ -1,0 +1,7 @@
+; Derived from /Users/konrad/git/finances/journal/accounts.journal
+account assets:bank:td:checking_4506
+account assets:bank:td:us_checking_9010
+account expenses:alcohol & bars
+account expenses:food:coffee shops
+account liabilities:student_loan:federal
+account revenues:salary:intuit

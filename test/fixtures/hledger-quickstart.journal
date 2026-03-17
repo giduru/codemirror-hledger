@@ -1,0 +1,13 @@
+commodity $1000.00
+
+account assets:bank:checking
+account income:salary
+account expenses:food
+
+2023-01-01 opening balances            ; <- First transaction sets starting balances.
+    assets:bank:checking        $1000  ; <- Account names can be anything.
+    equity:opening/closing     $-1000
+
+2023-02-15 market
+    expenses:food               $50
+    assets:bank:checking

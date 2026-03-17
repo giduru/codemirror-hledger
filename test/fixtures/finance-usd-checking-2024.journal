@@ -1,0 +1,15 @@
+2024-01-31 INTEREST CREDIT
+    assets:bank:td:us_checking_9010         USD 0.02
+    revenues:interest
+
+2024-02-29 240229S9576100WIRE etrade
+    assets:bank:td:us_checking_9010     USD 17792.60
+    revenues:sale_of_stocks
+
+2024-02-29 WS Investments INV
+    assets:bank:td:us_checking_9010    USD -25000.00
+    assets:investment:ws
+
+2024-02-29 withdrawn fee
+    assets:bank:td:us_checking_9010        USD -1.25
+    expenses:fees:bank

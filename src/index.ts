@@ -1,9 +1,10 @@
 import {parser as hledgerParser} from "./syntax.grammar"
-import {LRLanguage, LanguageSupport, indentNodeProp, foldNodeProp, foldInside} from "@codemirror/language"
+import {LRParser} from "@lezer/lr"
+import {LRLanguage, LanguageSupport, indentNodeProp, foldNodeProp} from "@codemirror/language"
 import {styleTags, tags as t} from "@lezer/highlight"
 import {Completion, CompletionContext, CompletionResult} from "@codemirror/autocomplete"
 
-export {hledgerParser as parser}
+export const parser: LRParser = hledgerParser
 
 export const hledgerLanguage = LRLanguage.define({
   parser: hledgerParser.configure({
@@ -80,7 +81,7 @@ const accountPrefixCompletions: Completion[] = [
   {label: "revenues:", type: "variable"},
 ]
 
-function hledgerCompletion(context: CompletionContext): CompletionResult | null {
+export function hledgerCompletion(context: CompletionContext): CompletionResult | null {
   let lineStart = context.matchBefore(/^[a-z][\w -]*/m)
   if (lineStart && context.state.doc.lineAt(context.pos).from === lineStart.from) {
     return {
@@ -105,7 +106,7 @@ function hledgerCompletion(context: CompletionContext): CompletionResult | null 
   return null
 }
 
-export function hledger() {
+export function hledger(): LanguageSupport {
   return new LanguageSupport(hledgerLanguage, [
     hledgerLanguage.data.of({autocomplete: hledgerCompletion}),
   ])

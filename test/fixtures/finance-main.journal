@@ -1,0 +1,5 @@
+include ./accounts.journal
+include ./commodities.journal
+
+include ./2023/2023.journal
+include ./2024/2024.journal

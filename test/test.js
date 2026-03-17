@@ -1,193 +1,194 @@
-import {hledgerLanguage} from "../dist/index.js"
 import assert from "assert"
+import {readFileSync} from "fs"
+import path from "path"
+import {fileURLToPath} from "url"
+import {hledgerLanguage} from "../dist/index.js"
 
-// Helper: tokenize a string and return array of {text, style} objects
-function tokenize(input) {
-  let lang = hledgerLanguage
-  let tree = lang.parser.parse(input)
-  let tokens = []
-  tree.iterate({
-    enter(node) {
-      if (node.firstChild) return
-      let text = input.slice(node.from, node.to)
-      let styles = lang.highlight(node)
-      tokens.push({text, type: node.type.name, from: node.from, to: node.to})
-    }
-  })
-  return tokens
-}
+const fixtureDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures")
 
-function printTree(input) {
+function inspectParse(input) {
   let tree = hledgerLanguage.parser.parse(input)
-  let lines = []
+  let counts = new Map()
+  let errors = []
+
   tree.iterate({
     enter(node) {
-      let indent = "  ".repeat(node.depth || 0)
-      let text = input.slice(node.from, node.to).replace(/\n/g, "\\n")
-      if (text.length > 50) text = text.slice(0, 47) + "..."
-      lines.push(`${indent}${node.type.name} [${node.from}-${node.to}] "${text}"`)
+      counts.set(node.type.name, (counts.get(node.type.name) || 0) + 1)
+
+      if (node.type.isError) {
+        errors.push({
+          at: offsetToLineColumn(input, node.from),
+          text: input.slice(node.from, node.to),
+        })
+      }
     }
   })
-  return lines.join("\n")
+
+  return {tree, counts, errors}
 }
 
-function getNodeNames(input) {
-  let tree = hledgerLanguage.parser.parse(input)
-  let names = []
-  tree.iterate({
-    enter(node) {
-      if (node.type.name !== "⚠") names.push(node.type.name)
+function offsetToLineColumn(input, offset) {
+  let line = 1
+  let column = 1
+
+  for (let i = 0; i < offset; i++) {
+    if (input.charCodeAt(i) === 10) {
+      line++
+      column = 1
+    } else {
+      column++
     }
-  })
-  return names
+  }
+
+  return `${line}:${column}`
 }
 
-describe("hledger language", () => {
-  it("should export hledgerLanguage", () => {
+function count(summary, nodeName) {
+  return summary.counts.get(nodeName) || 0
+}
+
+function readFixture(name) {
+  return readFileSync(path.join(fixtureDir, name), "utf8")
+}
+
+function assertParsesWithoutErrors(summary, name) {
+  assert.deepStrictEqual(
+    summary.errors,
+    [],
+    `Unexpected parser errors in ${name}:\n${summary.errors.map(({at, text}) => `${at} ${JSON.stringify(text)}`).join("\n")}`
+  )
+}
+
+function assertCounts(summary, expectedCounts, name) {
+  for (let [nodeName, expectedCount] of Object.entries(expectedCounts)) {
+    assert.strictEqual(
+      count(summary, nodeName),
+      expectedCount,
+      `${name}: expected ${expectedCount} ${nodeName} nodes, got ${count(summary, nodeName)}`
+    )
+  }
+}
+
+const fixtureCases = [
+  {
+    name: "finances main includes",
+    file: "finance-main.journal",
+    expectedCounts: {
+      Directive: 4,
+    },
+  },
+  {
+    name: "finances account declarations",
+    file: "finance-accounts.journal",
+    expectedCounts: {
+      LineComment: 1,
+      Directive: 6,
+    },
+  },
+  {
+    name: "finances USD checking transactions",
+    file: "finance-usd-checking-2024.journal",
+    expectedCounts: {
+      Transaction: 4,
+      Posting: 8,
+      Amount: 4,
+      Commodity: 4,
+      Sign: 2,
+    },
+  },
+  {
+    name: "quickstart directives and postings",
+    file: "hledger-quickstart.journal",
+    expectedCounts: {
+      Directive: 4,
+      Transaction: 2,
+      Posting: 4,
+      InlineComment: 1,
+      CommentBody: 1,
+    },
+  },
+  {
+    name: "multicurrency costs, assertions, and comments",
+    file: "hledger-multicurrency.journal",
+    expectedCounts: {
+      LineComment: 1,
+      BlockComment: 1,
+      Transaction: 2,
+      Posting: 4,
+      CostAnnotation: 1,
+      BalanceAssertion: 1,
+    },
+  },
+  {
+    name: "alias directives and forecast transactions",
+    file: "hledger-forecast-alias.journal",
+    expectedCounts: {
+      Directive: 2,
+      Transaction: 1,
+      PeriodicTransaction: 1,
+      Posting: 2,
+    },
+  },
+  {
+    name: "auto postings with numeric amounts",
+    file: "hledger-auto-posting.journal",
+    expectedCounts: {
+      AutoPosting: 1,
+      Posting: 1,
+      Amount: 1,
+      Sign: 1,
+    },
+  },
+]
+
+describe("hledger parser", () => {
+  it("exports a parser", () => {
     assert.ok(hledgerLanguage)
     assert.ok(hledgerLanguage.parser)
   })
 
-  it("should parse a simple transaction without error", () => {
-    let input = "2024-01-15 Grocery store\n    expenses:food  $50.00\n    assets:checking\n"
-    let tree = hledgerLanguage.parser.parse(input)
-    assert.ok(tree)
-    assert.ok(tree.length > 0)
-  })
+  describe("fixture journals", () => {
+    for (let testCase of fixtureCases) {
+      it(`parses ${testCase.name} without errors`, () => {
+        let input = readFixture(testCase.file)
+        let summary = inspectParse(input)
 
-  it("should parse directives without error", () => {
-    let input = "account assets:checking\ncommodity $1,000.00\ninclude other.journal\n"
-    let tree = hledgerLanguage.parser.parse(input)
-    assert.ok(tree)
-  })
-
-  it("should parse comments without error", () => {
-    let input = "; This is a comment\n# Another comment\n* Star comment\n"
-    let tree = hledgerLanguage.parser.parse(input)
-    assert.ok(tree)
-  })
-
-  it("should parse block comments without error", () => {
-    let input = "comment\nThis is a block comment\nwith multiple lines\nend comment\n"
-    let tree = hledgerLanguage.parser.parse(input)
-    assert.ok(tree)
-  })
-
-  it("should parse periodic transactions without error", () => {
-    let input = "~ monthly\n    expenses:rent  $1000\n    assets:checking\n"
-    let tree = hledgerLanguage.parser.parse(input)
-    assert.ok(tree)
-  })
-
-  it("should parse auto postings without error", () => {
-    let input = "= expenses:food\n    budget:food  *-1\n"
-    let tree = hledgerLanguage.parser.parse(input)
-    assert.ok(tree)
-  })
-
-  it("should parse transactions with status and code", () => {
-    let input = "2024-01-15 * (123) Grocery store\n    expenses:food  $50\n    assets:checking\n"
-    let tree = hledgerLanguage.parser.parse(input)
-    assert.ok(tree)
-  })
-
-  it("should parse transactions with inline comments", () => {
-    let input = "2024-01-15 Grocery store  ; some comment\n    expenses:food  $50  ; food tag\n    assets:checking\n"
-    let tree = hledgerLanguage.parser.parse(input)
-    assert.ok(tree)
-  })
-
-  it("should parse various date formats", () => {
-    let inputs = [
-      "2024-01-15 test\n    a  1\n    b\n",
-      "2024/01/15 test\n    a  1\n    b\n",
-      "2024.01.15 test\n    a  1\n    b\n",
-    ]
-    for (let input of inputs) {
-      let tree = hledgerLanguage.parser.parse(input)
-      assert.ok(tree)
+        assert.ok(summary.tree.length > 0)
+        assertParsesWithoutErrors(summary, testCase.file)
+        assertCounts(summary, testCase.expectedCounts, testCase.file)
+      })
     }
   })
 
-  it("should parse price directives", () => {
-    let input = "P 2024-01-15 EUR $1.08\n"
-    let tree = hledgerLanguage.parser.parse(input)
-    assert.ok(tree)
-  })
+  describe("targeted constructs", () => {
+    it("parses supported transaction date separators", () => {
+      let inputs = [
+        "2024-01-15 test\n    assets:checking  $1\n    income\n",
+        "2024/01/15 test\n    assets:checking  $1\n    income\n",
+        "2024.01.15 test\n    assets:checking  $1\n    income\n",
+      ]
 
-  it("should parse alias directives", () => {
-    let input = "alias savings = assets:bank:savings\n"
-    let tree = hledgerLanguage.parser.parse(input)
-    assert.ok(tree)
-  })
+      for (let input of inputs) {
+        let summary = inspectParse(input)
+        assertParsesWithoutErrors(summary, "date-variant")
+        assertCounts(summary, {Transaction: 1, Posting: 2, Amount: 1}, "date-variant")
+      }
+    })
 
-  it("should parse year directives", () => {
-    let inputs = ["Y 2024\n", "year 2024\n"]
-    for (let input of inputs) {
-      let tree = hledgerLanguage.parser.parse(input)
-      assert.ok(tree)
-    }
-  })
+    it("parses price and year directives", () => {
+      let input = "P 2024-01-15 EUR $1.08\nY 2024\nyear 2025\n"
+      let summary = inspectParse(input)
 
-  it("should parse balance assertions", () => {
-    let input = "2024-01-15 test\n    assets:checking  $100 = $1000\n    income\n"
-    let tree = hledgerLanguage.parser.parse(input)
-    assert.ok(tree)
-  })
+      assertParsesWithoutErrors(summary, "price-and-year")
+      assertCounts(summary, {Directive: 3}, "price-and-year")
+    })
 
-  it("should parse cost notation", () => {
-    let input = "2024-01-15 test\n    assets:eur  100 EUR @ $1.08\n    assets:usd\n"
-    let tree = hledgerLanguage.parser.parse(input)
-    assert.ok(tree)
-  })
+    it("parses virtual postings", () => {
+      let input = "2024-01-15 envelope\n    (budget:food)  $50\n    [assets:checking]  $50\n"
+      let summary = inspectParse(input)
 
-  it("should parse virtual postings", () => {
-    let input = "2024-01-15 test\n    (budget:food)  $50\n    [assets:checking]  $50\n"
-    let tree = hledgerLanguage.parser.parse(input)
-    assert.ok(tree)
-  })
-
-  it("should produce Transaction nodes with Posting children", () => {
-    let input = "2024-01-15 Grocery store\n    expenses:food  $50.00\n    assets:checking\n"
-    let names = getNodeNames(input)
-    assert.ok(names.includes("Journal"))
-    assert.ok(names.includes("Transaction"))
-    assert.ok(names.includes("TxnHeader"))
-    assert.ok(names.includes("Posting"))
-    assert.ok(names.includes("AccountName"))
-  })
-
-  it("should produce Amount nodes with Commodity and Number", () => {
-    let input = "2024-01-15 test\n    expenses:food  $50.00\n    assets:checking\n"
-    let names = getNodeNames(input)
-    assert.ok(names.includes("Amount"))
-    assert.ok(names.includes("Number"))
-    assert.ok(names.includes("Commodity"))
-  })
-
-  it("should parse complex journal", () => {
-    let input = `; Main journal file
-account assets:checking
-account expenses:food
-commodity $1,000.00
-
-2024-01-15 * (1001) Grocery Store | Weekly shopping  ; trip:weekly
-    expenses:food:groceries  $45.50
-    expenses:food:snacks     $12.30  ; junk food
-    assets:checking
-
-2024-01-16 ! Landlord
-    expenses:rent  $1,500.00
-    assets:checking  = $3,500.00
-
-~ monthly
-    expenses:utilities  $200
-    assets:checking
-
-P 2024-01-15 EUR $1.08
-`
-    let tree = hledgerLanguage.parser.parse(input)
-    assert.ok(tree)
-    assert.ok(tree.length > 0)
+      assertParsesWithoutErrors(summary, "virtual-postings")
+      assertCounts(summary, {Transaction: 1, Posting: 2, Amount: 2, Commodity: 2}, "virtual-postings")
+    })
   })
 })
