@@ -183,6 +183,34 @@ describe("hledger parser", () => {
       assertCounts(summary, {Directive: 3}, "price-and-year")
     })
 
+    it("parses include directives with glob-like arguments", () => {
+      let inputs = [
+        "include nosuchfile*\n",
+        "include **foo\n",
+        "include ***\n",
+      ]
+
+      for (let input of inputs) {
+        let summary = inspectParse(input)
+        assertParsesWithoutErrors(summary, "include-glob")
+        assertCounts(summary, {Directive: 1}, "include-glob")
+      }
+    })
+
+    it("parses include directives with trailing comments", () => {
+      let inputs = [
+        "include other.journal ; note\n",
+        "include foo*.journal ; glob note\n",
+      ]
+
+      for (let input of inputs) {
+        let summary = inspectParse(input)
+        assertParsesWithoutErrors(summary, "include-comment")
+        assertCounts(summary, {Directive: 1}, "include-comment")
+        assertCounts(summary, {InlineComment: 0, CommentBody: 0}, "include-comment")
+      }
+    })
+
     it("parses virtual postings", () => {
       let input = "2024-01-15 envelope\n    (budget:food)  $50\n    [assets:checking]  $50\n"
       let summary = inspectParse(input)
