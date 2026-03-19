@@ -1,6 +1,6 @@
 {
   "name": "codemirror-lang-hledger",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "hledger journal format language support for CodeMirror",
   "scripts": {
     "test": "mocha test/test.js",
@@ -24,9 +24,14 @@
     "plaintext-accounting",
     "syntax-highlighting"
   ],
+  "author": "Giduru",
+  "homepage": "https://github.com/giduru/codemirror-hledger#readme",
+  "bugs": {
+    "url": "https://github.com/giduru/codemirror-hledger/issues"
+  },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/KonradStanski/codemirror-hledger.git"
+    "url": "git+https://github.com/giduru/codemirror-hledger.git"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.0.0",
