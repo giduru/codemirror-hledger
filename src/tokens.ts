@@ -1,8 +1,15 @@
 import {ExternalTokenizer, InputStream} from "@lezer/lr"
 import {
-  TxnHeader, PeriodicHeader, AutoHeader, Directive, BlockComment,
+  TxnHeader, PeriodicHeader, AutoHeader, BlockComment,
   LineComment, BlankLine, PostingIndent, CommentIndent, AccountName,
-  CommentBody, Newline
+  CommentBody, Newline,
+  AccountKeyword, CommodityKeyword, IncludeKeyword, AliasKeyword,
+  PayeeKeyword, TagKeyword, PriceKeyword, DefaultCommodityKeyword,
+  YearKeyword, DecimalMarkKeyword, ApplyAccountKeyword,
+  ApplyYearKeyword, ApplyTagKeyword, ApplyFixedKeyword,
+  CommodityConversionKeyword, BucketKeyword, IgnoredPriceKeyword,
+  EndKeyword,
+  DirectiveAccountName, DirectiveArgument, IncludePath
 } from "./syntax.grammar.terms"
 
 const CH_NEWLINE = 10
@@ -80,10 +87,31 @@ function matchKeywordExact(input: InputStream, offset: number, kw: string): bool
   return after === CH_NEWLINE || after < 0 || after === CH_SPACE || after === CH_TAB
 }
 
-const DIRECTIVE_KEYWORDS = [
-  "account", "commodity", "payee", "tag", "include", "alias",
-  "decimal-mark", "apply account", "end aliases", "end apply account",
-  "end apply year", "end apply tag", "end comment", "year"
+// Directive keywords with their token IDs — order matters for matching.
+// Longer multi-word prefixes must come before shorter ones to avoid
+// ambiguity (e.g. "end apply account" before "end").
+const DIRECTIVE_MAP: Array<{kw: string, token: number}> = [
+  {kw: "account", token: AccountKeyword},
+  {kw: "commodity", token: CommodityKeyword},
+  {kw: "include", token: IncludeKeyword},
+  {kw: "alias", token: AliasKeyword},
+  {kw: "payee", token: PayeeKeyword},
+  {kw: "tag", token: TagKeyword},
+  {kw: "decimal-mark", token: DecimalMarkKeyword},
+  {kw: "apply account", token: ApplyAccountKeyword},
+  {kw: "apply year", token: ApplyYearKeyword},
+  {kw: "apply tag", token: ApplyTagKeyword},
+  {kw: "apply fixed", token: ApplyFixedKeyword},
+  {kw: "end apply account", token: EndKeyword},
+  {kw: "end apply year", token: EndKeyword},
+  {kw: "end apply tag", token: EndKeyword},
+  {kw: "end apply fixed", token: EndKeyword},
+  {kw: "end aliases", token: EndKeyword},
+  {kw: "end comment", token: EndKeyword},
+  {kw: "end tag", token: EndKeyword},
+  {kw: "end", token: EndKeyword},
+  {kw: "year", token: YearKeyword},
+  {kw: "bucket", token: BucketKeyword},
 ]
 
 /// Header-level tokenizer: recognizes complete first lines of top-level entries.
@@ -162,21 +190,37 @@ export const headerTokens = new ExternalTokenizer((input) => {
     }
   }
 
-  // Single-letter directives P, D, Y
-  if ((ch === 80 || ch === 68 || ch === 89) &&
-      (input.peek(1) === CH_SPACE || input.peek(1) === CH_TAB)) {
-    let i = skipToEOL(input, 0)
-    if (input.peek(i) === CH_NEWLINE) i++
-    input.acceptToken(Directive, i)
+  // Single-letter directives: P (price), D (default commodity), Y (year),
+  // C (commodity conversion), A (bucket), N (ignored price commodity)
+  if (ch === 80 /* P */ && (input.peek(1) === CH_SPACE || input.peek(1) === CH_TAB)) {
+    input.acceptToken(PriceKeyword, 1)
+    return
+  }
+  if (ch === 68 /* D */ && (input.peek(1) === CH_SPACE || input.peek(1) === CH_TAB)) {
+    input.acceptToken(DefaultCommodityKeyword, 1)
+    return
+  }
+  if (ch === 89 /* Y */ && (input.peek(1) === CH_SPACE || input.peek(1) === CH_TAB)) {
+    input.acceptToken(YearKeyword, 1)
+    return
+  }
+  if (ch === 67 /* C */ && (input.peek(1) === CH_SPACE || input.peek(1) === CH_TAB)) {
+    input.acceptToken(CommodityConversionKeyword, 1)
+    return
+  }
+  if (ch === 65 /* A */ && (input.peek(1) === CH_SPACE || input.peek(1) === CH_TAB)) {
+    input.acceptToken(BucketKeyword, 1)
+    return
+  }
+  if (ch === 78 /* N */ && (input.peek(1) === CH_SPACE || input.peek(1) === CH_TAB)) {
+    input.acceptToken(IgnoredPriceKeyword, 1)
     return
   }
 
-  // Multi-word directives
-  for (let kw of DIRECTIVE_KEYWORDS) {
-    if (matchKeyword(input, 0, kw)) {
-      let i = skipToEOL(input, kw.length)
-      if (input.peek(i) === CH_NEWLINE) i++
-      input.acceptToken(Directive, i)
+  // Multi-word directive keywords
+  for (let entry of DIRECTIVE_MAP) {
+    if (matchKeyword(input, 0, entry.kw)) {
+      input.acceptToken(entry.token, entry.kw.length)
       return
     }
   }
@@ -189,6 +233,71 @@ export const headerTokens = new ExternalTokenizer((input) => {
     return
   }
 }, {contextual: false})
+
+
+/// Directive argument tokenizers: consume the rest of the line after a directive keyword.
+
+export const directiveArgTokens = new ExternalTokenizer((input, stack) => {
+  let ch = input.peek(0)
+
+  // Don't match if we're at whitespace (let the parser skip rule handle it)
+  if (ch === CH_SPACE || ch === CH_TAB || isEOL(ch)) return
+
+  // Figure out which token to emit based on what the parser can shift
+  if (stack.canShift(DirectiveAccountName)) {
+    // account directive: consume account name (to EOL, strip trailing spaces/comments)
+    let end = 0
+    let lastNonSpace = -1
+    while (!isEOL(input.peek(end))) {
+      let c = input.peek(end)
+      // Stop at double-space or semicolon (inline comment)
+      if (c === CH_SEMI) break
+      if (c === CH_SPACE) {
+        let j = end
+        while (input.peek(j) === CH_SPACE) j++
+        if (j - end >= 2) break
+        let after = input.peek(j)
+        if (after === CH_SEMI || isEOL(after)) break
+      }
+      if (c !== CH_SPACE && c !== CH_TAB) lastNonSpace = end
+      end++
+    }
+    if (lastNonSpace >= 0) {
+      input.acceptToken(DirectiveAccountName, lastNonSpace + 1)
+    }
+    return
+  }
+
+  if (stack.canShift(IncludePath)) {
+    // include directive: consume the path/glob to EOL
+    let end = 0
+    let lastNonSpace = -1
+    while (!isEOL(input.peek(end))) {
+      let c = input.peek(end)
+      if (c !== CH_SPACE && c !== CH_TAB) lastNonSpace = end
+      end++
+    }
+    if (lastNonSpace >= 0) {
+      input.acceptToken(IncludePath, lastNonSpace + 1)
+    }
+    return
+  }
+
+  if (stack.canShift(DirectiveArgument)) {
+    // Generic directive argument: everything to EOL
+    let end = 0
+    let lastNonSpace = -1
+    while (!isEOL(input.peek(end))) {
+      let c = input.peek(end)
+      if (c !== CH_SPACE && c !== CH_TAB) lastNonSpace = end
+      end++
+    }
+    if (lastNonSpace >= 0) {
+      input.acceptToken(DirectiveArgument, lastNonSpace + 1)
+    }
+    return
+  }
+}, {contextual: true})
 
 
 /// Posting-level tokenizer: PostingIndent, CommentIndent, Newline.
@@ -230,8 +339,18 @@ export const commentBodyToken = new ExternalTokenizer((input, stack) => {
 }, {contextual: true})
 
 /// Account name tokenizer: consumes chars until 2+ spaces, tab, semicolon, or EOL.
+/// Skips leading status markers (* or !) followed by space so the parser can
+/// match them as Status tokens.
 export const accountNameToken = new ExternalTokenizer((input) => {
   let i = 0
+  let firstCh = input.peek(0)
+
+  // Don't consume * or ! at start if followed by space — that's a Status token
+  if ((firstCh === CH_STAR || firstCh === 33 /* ! */) &&
+      (input.peek(1) === CH_SPACE || input.peek(1) === CH_TAB)) {
+    return
+  }
+
   let lastNonSpace = -1
 
   while (true) {

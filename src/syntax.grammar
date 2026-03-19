@@ -4,7 +4,24 @@ item {
   Transaction |
   PeriodicTransaction |
   AutoPosting |
-  Directive |
+  AccountDirective |
+  CommodityDirective |
+  IncludeDirective |
+  AliasDirective |
+  PayeeDirective |
+  TagDirective |
+  PriceDirective |
+  DefaultCommodityDirective |
+  YearDirective |
+  DecimalMarkDirective |
+  ApplyAccountDirective |
+  ApplyYearDirective |
+  ApplyTagDirective |
+  ApplyFixedDirective |
+  CommodityConversionDirective |
+  BucketDirective |
+  IgnoredPriceDirective |
+  EndDirective |
   BlockComment |
   LineComment |
   BlankLine
@@ -25,6 +42,81 @@ AutoPosting {
   indentedLine*
 }
 
+AccountDirective {
+  AccountKeyword DirectiveAccountName Newline
+  indentedLine*
+}
+
+CommodityDirective {
+  CommodityKeyword DirectiveArgument Newline
+  indentedLine*
+}
+
+IncludeDirective {
+  IncludeKeyword IncludePath Newline
+}
+
+AliasDirective {
+  AliasKeyword DirectiveArgument Newline
+}
+
+PayeeDirective {
+  PayeeKeyword DirectiveArgument Newline
+}
+
+TagDirective {
+  TagKeyword DirectiveArgument Newline
+  indentedLine*
+}
+
+PriceDirective {
+  PriceKeyword DirectiveArgument Newline
+}
+
+DefaultCommodityDirective {
+  DefaultCommodityKeyword DirectiveArgument Newline
+}
+
+YearDirective {
+  YearKeyword DirectiveArgument Newline
+}
+
+DecimalMarkDirective {
+  DecimalMarkKeyword DirectiveArgument Newline
+}
+
+ApplyAccountDirective {
+  ApplyAccountKeyword DirectiveArgument Newline
+}
+
+ApplyYearDirective {
+  ApplyYearKeyword DirectiveArgument Newline
+}
+
+ApplyTagDirective {
+  ApplyTagKeyword DirectiveArgument Newline
+}
+
+ApplyFixedDirective {
+  ApplyFixedKeyword DirectiveArgument Newline
+}
+
+CommodityConversionDirective {
+  CommodityConversionKeyword DirectiveArgument Newline
+}
+
+BucketDirective {
+  BucketKeyword DirectiveArgument Newline
+}
+
+IgnoredPriceDirective {
+  IgnoredPriceKeyword DirectiveArgument Newline
+}
+
+EndDirective {
+  EndKeyword DirectiveArgument? Newline
+}
+
 indentedLine {
   Posting |
   IndentedComment
@@ -35,15 +127,15 @@ Posting {
 }
 
 Amount {
-  Commodity? Sign? Number Commodity?
+  Sign? Commodity? Sign? Number Commodity?
 }
 
 CostAnnotation {
-  CostOp Commodity? Sign? Number Commodity?
+  CostOp Sign? Commodity? Sign? Number Commodity?
 }
 
 BalanceAssertion {
-  BalanceOp Commodity? Sign? Number Commodity?
+  BalanceOp Sign? Commodity? Sign? Number Commodity?
 }
 
 IndentedComment {
@@ -56,10 +148,33 @@ InlineComment { CommentMark CommentBody }
   TxnHeader,
   PeriodicHeader,
   AutoHeader,
-  Directive,
+  AccountKeyword,
+  CommodityKeyword,
+  IncludeKeyword,
+  AliasKeyword,
+  PayeeKeyword,
+  TagKeyword,
+  PriceKeyword,
+  DefaultCommodityKeyword,
+  YearKeyword,
+  DecimalMarkKeyword,
+  ApplyAccountKeyword,
+  ApplyYearKeyword,
+  ApplyTagKeyword,
+  ApplyFixedKeyword,
+  CommodityConversionKeyword,
+  BucketKeyword,
+  IgnoredPriceKeyword,
+  EndKeyword,
   BlockComment,
   LineComment,
   BlankLine
+}
+
+@external tokens directiveArgTokens from "./tokens" {
+  DirectiveAccountName,
+  DirectiveArgument,
+  IncludePath
 }
 
 @external tokens postingTokens from "./tokens" {

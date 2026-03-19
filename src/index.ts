@@ -13,9 +13,35 @@ export const hledgerLanguage = LRLanguage.define({
         TxnHeader: t.meta,
         PeriodicHeader: t.meta,
         AutoHeader: t.meta,
-        Directive: t.processingInstruction,
         BlockComment: t.blockComment,
         LineComment: t.lineComment,
+
+        // Directive keywords
+        AccountKeyword: t.keyword,
+        CommodityKeyword: t.keyword,
+        IncludeKeyword: t.keyword,
+        AliasKeyword: t.keyword,
+        PayeeKeyword: t.keyword,
+        TagKeyword: t.keyword,
+        PriceKeyword: t.keyword,
+        DefaultCommodityKeyword: t.keyword,
+        YearKeyword: t.keyword,
+        DecimalMarkKeyword: t.keyword,
+        ApplyAccountKeyword: t.keyword,
+        ApplyYearKeyword: t.keyword,
+        ApplyTagKeyword: t.keyword,
+        ApplyFixedKeyword: t.keyword,
+        CommodityConversionKeyword: t.keyword,
+        BucketKeyword: t.keyword,
+        IgnoredPriceKeyword: t.keyword,
+        EndKeyword: t.keyword,
+
+        // Directive arguments
+        DirectiveAccountName: t.variableName,
+        DirectiveArgument: t.string,
+        IncludePath: t.string,
+
+        // Posting nodes
         AccountName: t.variableName,
         Number: t.number,
         Sign: t.operator,
@@ -31,6 +57,7 @@ export const hledgerLanguage = LRLanguage.define({
         Transaction: () => 4,
         PeriodicTransaction: () => 4,
         AutoPosting: () => 4,
+        AccountDirective: () => 4,
       }),
       foldNodeProp.add({
         Transaction(node) {
@@ -44,6 +71,21 @@ export const hledgerLanguage = LRLanguage.define({
           return {from: first.to, to: node.to}
         },
         AutoPosting(node) {
+          let first = node.firstChild
+          if (!first) return null
+          return {from: first.to, to: node.to}
+        },
+        AccountDirective(node) {
+          let first = node.firstChild
+          if (!first) return null
+          return {from: first.to, to: node.to}
+        },
+        CommodityDirective(node) {
+          let first = node.firstChild
+          if (!first) return null
+          return {from: first.to, to: node.to}
+        },
+        TagDirective(node) {
           let first = node.firstChild
           if (!first) return null
           return {from: first.to, to: node.to}
@@ -70,6 +112,13 @@ const directiveCompletions: Completion[] = [
   {label: "comment", type: "keyword"},
   {label: "end comment", type: "keyword"},
   {label: "year", type: "keyword"},
+  {label: "apply year", type: "keyword"},
+  {label: "end apply year", type: "keyword"},
+  {label: "apply tag", type: "keyword"},
+  {label: "end apply tag", type: "keyword"},
+  {label: "apply fixed", type: "keyword"},
+  {label: "end apply fixed", type: "keyword"},
+  {label: "bucket", type: "keyword"},
 ]
 
 const accountPrefixCompletions: Completion[] = [
