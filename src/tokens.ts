@@ -1,6 +1,6 @@
 import {ExternalTokenizer, InputStream} from "@lezer/lr"
 import {
-  TxnHeader, PeriodicHeader, AutoHeader, BlockComment,
+  TxnDate, PeriodicMark, AutoMark, BlockComment,
   LineComment, BlankLine, PostingIndent, CommentIndent, AccountName,
   CommentBody, Newline,
   AccountKeyword, CommodityKeyword, IncludeKeyword, AliasKeyword,
@@ -9,7 +9,8 @@ import {
   ApplyYearKeyword, ApplyTagKeyword, ApplyFixedKeyword,
   CommodityConversionKeyword, BucketKeyword, IgnoredPriceKeyword,
   EndKeyword,
-  DirectiveAccountName, DirectiveArgument, IncludePath
+  DirectiveAccountName, DirectiveArgument, IncludePath, TxnDescription,
+  PeriodicExpression, AutoQuery
 } from "./syntax.grammar.terms"
 
 const CH_NEWLINE = 10
@@ -162,30 +163,30 @@ export const headerTokens = new ExternalTokenizer((input) => {
     return
   }
 
-  // Periodic transaction
+  // Periodic transaction — emit just the ~ mark
   if (ch === CH_TILDE) {
-    let i = skipToEOL(input, 1)
-    if (input.peek(i) === CH_NEWLINE) i++
-    input.acceptToken(PeriodicHeader, i)
+    input.acceptToken(PeriodicMark, 1)
     return
   }
 
-  // Auto posting
+  // Auto posting — emit just the = mark
   if (ch === CH_EQUALS && input.peek(1) !== CH_EQUALS) {
-    let i = skipToEOL(input, 1)
-    if (input.peek(i) === CH_NEWLINE) i++
-    input.acceptToken(AutoHeader, i)
+    input.acceptToken(AutoMark, 1)
     return
   }
 
-  // Transaction date
+  // Transaction date — emit just the date (including optional secondary date)
   let dateLen = matchDate(input, 0)
   if (dateLen > 0) {
-    let afterDate = input.peek(dateLen)
+    let totalLen = dateLen
+    // Check for secondary date: =DATE
+    if (input.peek(totalLen) === CH_EQUALS) {
+      let secLen = matchDate(input, totalLen + 1)
+      if (secLen > 0) totalLen += 1 + secLen
+    }
+    let afterDate = input.peek(totalLen)
     if (afterDate === CH_SPACE || afterDate === CH_TAB || isEOL(afterDate)) {
-      let i = skipToEOL(input, dateLen)
-      if (input.peek(i) === CH_NEWLINE) i++
-      input.acceptToken(TxnHeader, i)
+      input.acceptToken(TxnDate, totalLen)
       return
     }
   }
@@ -279,6 +280,51 @@ export const directiveArgTokens = new ExternalTokenizer((input, stack) => {
     }
     if (lastNonSpace >= 0) {
       input.acceptToken(IncludePath, lastNonSpace + 1)
+    }
+    return
+  }
+
+  if (stack.canShift(PeriodicExpression)) {
+    // Periodic transaction expression: everything to EOL
+    let end = 0
+    let lastNonSpace = -1
+    while (!isEOL(input.peek(end))) {
+      let c = input.peek(end)
+      if (c !== CH_SPACE && c !== CH_TAB) lastNonSpace = end
+      end++
+    }
+    if (lastNonSpace >= 0) {
+      input.acceptToken(PeriodicExpression, lastNonSpace + 1)
+    }
+    return
+  }
+
+  if (stack.canShift(AutoQuery)) {
+    // Auto posting query: everything to EOL
+    let end = 0
+    let lastNonSpace = -1
+    while (!isEOL(input.peek(end))) {
+      let c = input.peek(end)
+      if (c !== CH_SPACE && c !== CH_TAB) lastNonSpace = end
+      end++
+    }
+    if (lastNonSpace >= 0) {
+      input.acceptToken(AutoQuery, lastNonSpace + 1)
+    }
+    return
+  }
+
+  if (stack.canShift(TxnDescription)) {
+    // Transaction description: everything to EOL (including status, code, description, inline comment)
+    let end = 0
+    let lastNonSpace = -1
+    while (!isEOL(input.peek(end))) {
+      let c = input.peek(end)
+      if (c !== CH_SPACE && c !== CH_TAB) lastNonSpace = end
+      end++
+    }
+    if (lastNonSpace >= 0) {
+      input.acceptToken(TxnDescription, lastNonSpace + 1)
     }
     return
   }

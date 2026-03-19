@@ -28,18 +28,30 @@ item {
 }
 
 Transaction {
-  TxnHeader
+  TxnHeader Newline
   indentedLine*
+}
+
+TxnHeader {
+  TxnDate TxnDescription?
 }
 
 PeriodicTransaction {
-  PeriodicHeader
+  PeriodicHeader Newline
   indentedLine*
 }
 
+PeriodicHeader {
+  PeriodicMark PeriodicExpression?
+}
+
 AutoPosting {
-  AutoHeader
+  AutoHeader Newline
   indentedLine*
+}
+
+AutoHeader {
+  AutoMark AutoQuery?
 }
 
 AccountDirective {
@@ -145,9 +157,9 @@ IndentedComment {
 InlineComment { CommentMark CommentBody }
 
 @external tokens headerTokens from "./tokens" {
-  TxnHeader,
-  PeriodicHeader,
-  AutoHeader,
+  TxnDate,
+  PeriodicMark,
+  AutoMark,
   AccountKeyword,
   CommodityKeyword,
   IncludeKeyword,
@@ -174,7 +186,10 @@ InlineComment { CommentMark CommentBody }
 @external tokens directiveArgTokens from "./tokens" {
   DirectiveAccountName,
   DirectiveArgument,
-  IncludePath
+  IncludePath,
+  TxnDescription,
+  PeriodicExpression,
+  AutoQuery
 }
 
 @external tokens postingTokens from "./tokens" {

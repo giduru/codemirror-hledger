@@ -10,9 +10,12 @@ export const hledgerLanguage = LRLanguage.define({
   parser: hledgerParser.configure({
     props: [
       styleTags({
-        TxnHeader: t.meta,
-        PeriodicHeader: t.meta,
-        AutoHeader: t.meta,
+        TxnDate: t.meta,
+        TxnDescription: t.string,
+        PeriodicMark: t.meta,
+        PeriodicExpression: t.string,
+        AutoMark: t.meta,
+        AutoQuery: t.string,
         BlockComment: t.blockComment,
         LineComment: t.lineComment,
 

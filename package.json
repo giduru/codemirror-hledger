@@ -1,11 +1,12 @@
 {
   "name": "codemirror-lang-hledger",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "hledger journal format language support for CodeMirror",
   "scripts": {
     "test": "mocha test/test.js",
     "prepare": "rollup -c",
-    "demo": "npm run prepare && vite demo"
+    "demo": "npm run prepare && vite demo",
+    "publish": "npm login && npm publish"
   },
   "type": "module",
   "main": "dist/index.cjs",

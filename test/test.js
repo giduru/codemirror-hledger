@@ -492,6 +492,25 @@ describe("hledger parser", () => {
   // --- Transaction format tests ---
 
   describe("transaction format", () => {
+    it("splits TxnHeader into TxnDate and TxnDescription", () => {
+      let input = "2024-01-15 Grocery store\n    expenses:food  $50\n    assets:bank\n"
+      let summary = inspectParse(input)
+
+      assertParsesWithoutErrors(summary, "txn-split")
+      assertCounts(summary, {TxnHeader: 1, TxnDate: 1, TxnDescription: 1}, "txn-split")
+      assertNodeText(summary, "TxnDate", 0, "2024-01-15", "txn-split")
+      assertNodeText(summary, "TxnDescription", 0, "Grocery store", "txn-split")
+    })
+
+    it("parses TxnDate with secondary date", () => {
+      let input = "2024-01-15=2024-01-16 Transfer\n    assets:bank  $100\n    income\n"
+      let summary = inspectParse(input)
+
+      assertParsesWithoutErrors(summary, "secondary-date")
+      assertNodeText(summary, "TxnDate", 0, "2024-01-15=2024-01-16", "secondary-date")
+      assertNodeText(summary, "TxnDescription", 0, "Transfer", "secondary-date")
+    })
+
     it("parses supported date separators", () => {
       let inputs = [
         "2024-01-15 test\n    assets:checking  $1\n    income\n",
@@ -502,7 +521,7 @@ describe("hledger parser", () => {
       for (let input of inputs) {
         let summary = inspectParse(input)
         assertParsesWithoutErrors(summary, "date-variant")
-        assertCounts(summary, {Transaction: 1, Posting: 2, Amount: 1}, "date-variant")
+        assertCounts(summary, {Transaction: 1, TxnDate: 1, Posting: 2, Amount: 1}, "date-variant")
       }
     })
 
@@ -511,7 +530,8 @@ describe("hledger parser", () => {
       let summary = inspectParse(input)
 
       assertParsesWithoutErrors(summary, "txn-cleared")
-      assertCounts(summary, {Transaction: 1, Posting: 2}, "txn-cleared")
+      assertCounts(summary, {Transaction: 1, TxnDate: 1, TxnDescription: 1, Posting: 2}, "txn-cleared")
+      assertNodeText(summary, "TxnDescription", 0, "* Grocery store", "txn-cleared")
     })
 
     it("parses transaction with status marker !", () => {
@@ -519,7 +539,7 @@ describe("hledger parser", () => {
       let summary = inspectParse(input)
 
       assertParsesWithoutErrors(summary, "txn-pending")
-      assertCounts(summary, {Transaction: 1, Posting: 2}, "txn-pending")
+      assertCounts(summary, {Transaction: 1, TxnDate: 1, TxnDescription: 1, Posting: 2}, "txn-pending")
     })
 
     it("parses transaction with no description", () => {
@@ -527,7 +547,7 @@ describe("hledger parser", () => {
       let summary = inspectParse(input)
 
       assertParsesWithoutErrors(summary, "txn-no-desc")
-      assertCounts(summary, {Transaction: 1, Posting: 2}, "txn-no-desc")
+      assertCounts(summary, {Transaction: 1, TxnDate: 1, TxnDescription: 0, Posting: 2}, "txn-no-desc")
     })
 
     it("parses transaction with inline comment", () => {
@@ -544,6 +564,15 @@ describe("hledger parser", () => {
 
       assertParsesWithoutErrors(summary, "txn-comment-lines")
       assertCounts(summary, {IndentedComment: 1, Posting: 2}, "txn-comment-lines")
+    })
+
+    it("parses short date format (month/day)", () => {
+      let input = "1/15 test\n    expenses:food  $50\n    assets:bank\n"
+      let summary = inspectParse(input)
+
+      assertParsesWithoutErrors(summary, "short-date")
+      assertCounts(summary, {Transaction: 1, TxnDate: 1}, "short-date")
+      assertNodeText(summary, "TxnDate", 0, "1/15", "short-date")
     })
   })
 
@@ -717,20 +746,38 @@ describe("hledger parser", () => {
   // --- Periodic and auto posting tests ---
 
   describe("periodic and auto postings", () => {
-    it("parses periodic transaction", () => {
+    it("splits PeriodicHeader into PeriodicMark and PeriodicExpression", () => {
       let input = "~ monthly from 2021 to 2023 forecast\n    [assets:checking]    3\n"
       let summary = inspectParse(input)
 
       assertParsesWithoutErrors(summary, "periodic")
-      assertCounts(summary, {PeriodicTransaction: 1, PeriodicHeader: 1, Posting: 1}, "periodic")
+      assertCounts(summary, {
+        PeriodicTransaction: 1, PeriodicHeader: 1,
+        PeriodicMark: 1, PeriodicExpression: 1, Posting: 1,
+      }, "periodic")
+      assertNodeText(summary, "PeriodicMark", 0, "~", "periodic")
+      assertNodeText(summary, "PeriodicExpression", 0, "monthly from 2021 to 2023 forecast", "periodic")
     })
 
-    it("parses auto posting rule", () => {
+    it("parses periodic transaction with no expression", () => {
+      let input = "~\n    expenses:rent  $1200\n    assets:bank\n"
+      let summary = inspectParse(input)
+
+      assertParsesWithoutErrors(summary, "periodic-no-expr")
+      assertCounts(summary, {PeriodicMark: 1, PeriodicExpression: 0}, "periodic-no-expr")
+    })
+
+    it("splits AutoHeader into AutoMark and AutoQuery", () => {
       let input = "= expenses:food\n    budget:food  -1\n"
       let summary = inspectParse(input)
 
       assertParsesWithoutErrors(summary, "auto-posting")
-      assertCounts(summary, {AutoPosting: 1, AutoHeader: 1, Posting: 1}, "auto-posting")
+      assertCounts(summary, {
+        AutoPosting: 1, AutoHeader: 1,
+        AutoMark: 1, AutoQuery: 1, Posting: 1,
+      }, "auto-posting")
+      assertNodeText(summary, "AutoMark", 0, "=", "auto-posting")
+      assertNodeText(summary, "AutoQuery", 0, "expenses:food", "auto-posting")
     })
 
     it("parses auto posting with multiple postings", () => {
@@ -738,7 +785,7 @@ describe("hledger parser", () => {
       let summary = inspectParse(input)
 
       assertParsesWithoutErrors(summary, "auto-multi")
-      assertCounts(summary, {AutoPosting: 1, Posting: 2}, "auto-multi")
+      assertCounts(summary, {AutoPosting: 1, AutoMark: 1, AutoQuery: 1, Posting: 2}, "auto-multi")
     })
 
     // Note: the * multiplier prefix (e.g. *-1, *0.5) in auto postings is a
@@ -836,6 +883,122 @@ describe("hledger parser", () => {
     })
   })
 
+  // --- Individual node type verification ---
+
+  describe("individual node types", () => {
+    it("TxnDate node contains only the date", () => {
+      let summary = inspectParse("2024-01-15 desc\n    a  $1\n    b\n")
+      assertNodeText(summary, "TxnDate", 0, "2024-01-15", "TxnDate")
+    })
+
+    it("TxnDescription node contains description text", () => {
+      let summary = inspectParse("2024-01-15 Grocery store\n    a  $1\n    b\n")
+      assertNodeText(summary, "TxnDescription", 0, "Grocery store", "TxnDescription")
+    })
+
+    it("PeriodicMark node is just ~", () => {
+      let summary = inspectParse("~ monthly\n    a  $1\n    b\n")
+      assertNodeText(summary, "PeriodicMark", 0, "~", "PeriodicMark")
+    })
+
+    it("PeriodicExpression node contains the expression", () => {
+      let summary = inspectParse("~ every 2 weeks\n    a  $1\n    b\n")
+      assertNodeText(summary, "PeriodicExpression", 0, "every 2 weeks", "PeriodicExpression")
+    })
+
+    it("AutoMark node is just =", () => {
+      let summary = inspectParse("= expenses\n    a  -1\n")
+      assertNodeText(summary, "AutoMark", 0, "=", "AutoMark")
+    })
+
+    it("AutoQuery node contains the query expression", () => {
+      let summary = inspectParse("= expenses:food\n    a  -1\n")
+      assertNodeText(summary, "AutoQuery", 0, "expenses:food", "AutoQuery")
+    })
+
+    it("PostingIndent node contains leading whitespace", () => {
+      let summary = inspectParse("2024-01-15 t\n    a  $1\n    b\n")
+      assertNodeText(summary, "PostingIndent", 0, "    ", "PostingIndent")
+    })
+
+    it("AccountName node excludes trailing whitespace and amount", () => {
+      let summary = inspectParse("2024-01-15 t\n    expenses:food  $50\n    assets:bank\n")
+      assertNodeText(summary, "AccountName", 0, "expenses:food", "AccountName")
+    })
+
+    it("Status node is * or !", () => {
+      let summary = inspectParse("2024-01-15 t\n    * assets:bank  $100\n    income\n")
+      assertNodeText(summary, "Status", 0, "*", "Status")
+    })
+
+    it("Sign node is + or -", () => {
+      let summary = inspectParse("2024-01-15 t\n    a  -$50\n    b\n")
+      assertNodeText(summary, "Sign", 0, "-", "Sign")
+    })
+
+    it("Commodity node for prefix symbol", () => {
+      let summary = inspectParse("2024-01-15 t\n    a  $50\n    b\n")
+      assertNodeText(summary, "Commodity", 0, "$", "Commodity-prefix")
+    })
+
+    it("Commodity node for suffix symbol", () => {
+      let summary = inspectParse("2024-01-15 t\n    a  100 EUR\n    b\n")
+      assertNodeText(summary, "Commodity", 0, "EUR", "Commodity-suffix")
+    })
+
+    it("Number node contains numeric value", () => {
+      let summary = inspectParse("2024-01-15 t\n    a  $1,234.56\n    b\n")
+      assertNodeText(summary, "Number", 0, "1,234.56", "Number")
+    })
+
+    it("CostOp node is @ or @@", () => {
+      let summary1 = inspectParse("2024-01-15 t\n    a  10 EUR @ $1.10\n    b\n")
+      assertNodeText(summary1, "CostOp", 0, "@", "CostOp-unit")
+
+      let summary2 = inspectParse("2024-01-15 t\n    a  10 EUR @@ $11\n    b\n")
+      assertNodeText(summary2, "CostOp", 0, "@@", "CostOp-total")
+    })
+
+    it("BalanceOp node variants: =, ==, =*, ==*", () => {
+      let ops = [
+        {input: "2024-01-15 t\n    a  $100 = $1000\n    b\n", expected: "="},
+        {input: "2024-01-15 t\n    a  $100 == $1000\n    b\n", expected: "=="},
+        {input: "2024-01-15 t\n    a  $100 =* $1000\n    b\n", expected: "=*"},
+        {input: "2024-01-15 t\n    a  $100 ==* $1000\n    b\n", expected: "==*"},
+      ]
+      for (let {input, expected} of ops) {
+        let summary = inspectParse(input)
+        assertParsesWithoutErrors(summary, `BalanceOp-${expected}`)
+        assertNodeText(summary, "BalanceOp", 0, expected, `BalanceOp-${expected}`)
+      }
+    })
+
+    it("CommentMark node is ;", () => {
+      let summary = inspectParse("2024-01-15 t\n    a  $50  ; note\n    b\n")
+      assertNodeText(summary, "CommentMark", 0, ";", "CommentMark")
+    })
+
+    it("CommentBody node contains comment text", () => {
+      let summary = inspectParse("2024-01-15 t\n    a  $50  ; my note\n    b\n")
+      assertNodeText(summary, "CommentBody", 0, " my note", "CommentBody")
+    })
+
+    it("CommentIndent node for indented comments", () => {
+      let summary = inspectParse("2024-01-15 t\n    ; a comment\n    a  $50\n    b\n")
+      assertNodeText(summary, "CommentIndent", 0, "    ", "CommentIndent")
+    })
+
+    it("BlankLine node for empty lines", () => {
+      let summary = inspectParse("\n")
+      assertCounts(summary, {BlankLine: 1}, "BlankLine")
+    })
+
+    it("Newline node is produced", () => {
+      let summary = inspectParse("2024-01-15 t\n    a  $50\n    b\n")
+      assert.ok(count(summary, "Newline") >= 1, "should have Newline nodes")
+    })
+  })
+
   // --- Full journal integration test ---
 
   describe("full journal integration", () => {
@@ -890,8 +1053,14 @@ describe("hledger parser", () => {
         DefaultCommodityDirective: 1,
         YearDirective: 1,
         Transaction: 3,
+        TxnDate: 3,
+        TxnDescription: 3,
         PeriodicTransaction: 1,
+        PeriodicMark: 1,
+        PeriodicExpression: 1,
         AutoPosting: 1,
+        AutoMark: 1,
+        AutoQuery: 1,
       }, "full-journal")
     })
   })

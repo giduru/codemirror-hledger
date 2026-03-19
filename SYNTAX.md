@@ -28,15 +28,23 @@ DATE [STATUS] [DESCRIPTION] [; COMMENT]
 
 ### AST: `Transaction > TxnHeader, Posting*, IndentedComment*`
 
+`TxnHeader` is split into sub-nodes:
+- **`TxnDate`** — the date (including optional secondary date with `=`)
+- **`TxnDescription`** — everything after the date (status, code, description text)
+
 ### Dates
 
-Supported separators: `-`, `/`, `.` (must be consistent within a date).
+Supported separators: `-`, `/`, `.` (must be consistent within a date). Secondary dates use `=`.
 
 ```
 2024-01-15 Grocery store
 2024/01/15 Grocery store
 2024.01.15 Grocery store
+2024-01-15=2024-01-16 Transfer     ; secondary date
+1/15 Short date
 ```
+
+### AST: `TxnDate`, `TxnDescription`
 
 ### Status Markers
 
@@ -146,6 +154,10 @@ Templates for recurring entries, starting with `~`:
 
 ### AST: `PeriodicTransaction > PeriodicHeader, Posting*, IndentedComment*`
 
+`PeriodicHeader` is split into sub-nodes:
+- **`PeriodicMark`** — the `~` character
+- **`PeriodicExpression`** — the period expression (e.g. `monthly from 2024-01`)
+
 ---
 
 ## Auto Postings (Transaction Modifiers)
@@ -158,6 +170,10 @@ Rules that automatically add postings to matching transactions, starting with `=
 ```
 
 ### AST: `AutoPosting > AutoHeader, Posting*, IndentedComment*`
+
+`AutoHeader` is split into sub-nodes:
+- **`AutoMark`** — the `=` character
+- **`AutoQuery`** — the query expression (e.g. `expenses:food`)
 
 ---
 
@@ -383,9 +399,15 @@ Inside transactions or directives, indented lines starting with `;`:
 
 | Node | Style Tag | Description |
 |------|-----------|-------------|
-| `TxnHeader` | `meta` | Transaction header line (date + description) |
-| `PeriodicHeader` | `meta` | Periodic transaction header (`~` line) |
-| `AutoHeader` | `meta` | Auto posting header (`=` line) |
+| `TxnHeader` | _(container)_ | Transaction header line (date + description) |
+| `TxnDate` | `meta` | Transaction date (including secondary date) |
+| `TxnDescription` | `string` | Transaction description (status, code, text) |
+| `PeriodicHeader` | _(container)_ | Periodic transaction header |
+| `PeriodicMark` | `meta` | The `~` character |
+| `PeriodicExpression` | `string` | Period expression text |
+| `AutoHeader` | _(container)_ | Auto posting header |
+| `AutoMark` | `meta` | The `=` character |
+| `AutoQuery` | `string` | Auto posting query text |
 | `AccountKeyword` | `keyword` | The word `account` |
 | `CommodityKeyword` | `keyword` | The word `commodity` |
 | `IncludeKeyword` | `keyword` | The word `include` |
@@ -428,5 +450,5 @@ Inside transactions or directives, indented lines starting with `;`:
 - **Auto posting multiplier prefix** (`*0.5`, `*-1`): The `*` multiplier in auto posting rules conflicts with the `Status` marker. The grammar parses `*` as a status marker rather than a multiplier.
 - **Lot costs** (`{COST}`, `{{TOTAL_COST}}`): Not yet supported as distinct nodes.
 - **Lot dates** (`[DATE]` in posting modifiers): Not yet supported as distinct nodes.
-- **Secondary dates** (`DATE=DATE2`): Captured within `TxnHeader` but not as separate sub-nodes.
-- **Transaction codes** (`(CODE)`): Captured within `TxnHeader` but not as separate sub-nodes.
+- **Secondary dates** (`DATE=DATE2`): Captured within `TxnDate` as a single token (not split into primary/secondary).
+- **Transaction codes** (`(CODE)`): Captured within `TxnDescription` but not as a separate sub-node.
